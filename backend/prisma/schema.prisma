@@ -33,6 +33,12 @@ enum InvitationStatus {
   EXPIRED
 }
 
+enum ProjectInviteRole {
+  VIEWER
+  MEMBER
+  ADMIN
+}
+
 enum ActivityAction {
   TASK_CREATED
   TASK_UPDATED
@@ -75,6 +81,7 @@ model User {
   notifications    Notification[]
   teamMembers      TeamMember[]
   createdTeams     Team[]            @relation("CreatedTeams")
+  createdInviteLinks ProjectInviteLink[] @relation("CreatedInviteLinks")
 
   @@index([email])
 }
@@ -161,6 +168,7 @@ model Project {
   boards      Board[]
   activity    ActivityLog[]
   teams       ProjectTeam[]
+  inviteLinks ProjectInviteLink[]
 
   @@unique([workspaceId, key])
   @@index([workspaceId])
@@ -172,6 +180,7 @@ model ProjectMember {
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      ProjectInviteRole @default(MEMBER)
   createdAt DateTime @default(now())
 
   @@unique([projectId, userId])
@@ -423,5 +432,24 @@ model ProjectTeam {
 
   @@unique([projectId, teamId])
   @@index([teamId])
+}
+
+// -------------------------------------------------------------
+// ENLACES DE INVITACIÓN A PROYECTOS
+// -------------------------------------------------------------
+model ProjectInviteLink {
+  id        String            @id @default(uuid())
+  projectId String
+  project   Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  token     String            @unique @default(uuid())
+  role      ProjectInviteRole @default(MEMBER)
+  isActive  Boolean           @default(true)
+  expiresAt DateTime?
+  createdById String
+  createdBy   User            @relation("CreatedInviteLinks", fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt DateTime          @default(now())
+
+  @@index([projectId])
+  @@index([token])
 }
 

@@ -98,7 +98,16 @@ export class WorkspacesService {
     });
   }
 
-  static async delete(workspaceId: string) {
+  static async delete(workspaceId: string, confirmationName: string) {
+    const workspace = await prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { name: true },
+    });
+    if (!workspace) throw new NotFoundError('Espacio de trabajo no encontrado');
+    if (confirmationName !== workspace.name) {
+      throw new BadRequestError('El nombre de confirmación no coincide con el espacio de trabajo');
+    }
+
     return prisma.workspace.delete({
       where: { id: workspaceId },
     });

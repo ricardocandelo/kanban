@@ -84,6 +84,18 @@ router.get('/workspaces/:workspaceId/teams', async (req: AuthenticatedRequest, r
     });
     const isSuperAdmin = !!user?.isSuperAdmin;
 
+    if (!isSuperAdmin) {
+      const membership = await prisma.workspaceMember.findUnique({
+        where: {
+          workspaceId_userId: {
+            workspaceId: req.params.workspaceId,
+            userId: currentUserId,
+          },
+        },
+      });
+      if (!membership) throw new ForbiddenError('No perteneces a este espacio de trabajo');
+    }
+
     const teams = await prisma.team.findMany({
       where: { workspaceId: req.params.workspaceId },
       include: {
@@ -120,7 +132,32 @@ router.get('/workspaces/:workspaceId/teams', async (req: AuthenticatedRequest, r
       const userCanManage = isSuperAdmin || isCreator || isWsAdmin || hasDelegatedPermission;
 
       return {
-        ...team,
+        ...(!userCanManage
+          ? {
+              ...team,
+              workspace: undefined,
+              creator: team.creator
+                ? {
+                    id: team.creator.id,
+                    firstName: team.creator.firstName,
+                    lastName: team.creator.lastName,
+                    avatarUrl: team.creator.avatarUrl,
+                  }
+                : null,
+              members: team.members.map((member) => ({
+                id: member.id,
+                teamId: member.teamId,
+                userId: member.userId,
+                createdAt: member.createdAt,
+                user: {
+                  id: member.user.id,
+                  firstName: member.user.firstName,
+                  lastName: member.user.lastName,
+                  avatarUrl: member.user.avatarUrl,
+                },
+              })),
+            }
+          : team),
         userCanManage,
       };
     });
@@ -135,6 +172,24 @@ router.get('/workspaces/:workspaceId/teams', async (req: AuthenticatedRequest, r
 router.post('/workspaces/:workspaceId/teams', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const currentUserId = req.user!.userId;
+    const [user, membership] = await Promise.all([
+      prisma.user.findUnique({ where: { id: currentUserId }, select: { isSuperAdmin: true } }),
+      prisma.workspaceMember.findUnique({
+        where: {
+          workspaceId_userId: {
+            workspaceId: req.params.workspaceId,
+            userId: currentUserId,
+          },
+        },
+      }),
+    ]);
+    if (
+      !user?.isSuperAdmin &&
+      (!membership || (membership.role !== 'OWNER' && membership.role !== 'ADMIN'))
+    ) {
+      throw new ForbiddenError('Solo administradores del espacio pueden crear equipos');
+    }
+
     const data = createTeamSchema.parse(req.body);
 
     const team = await prisma.$transaction(async (tx) => {
@@ -386,7 +441,13 @@ router.get('/projects/:projectId/members', async (req: AuthenticatedRequest, res
       success: true,
       data: {
         members: Array.from(memberMap.values()),
-        teams: project.teams.map((pt) => pt.team),
+        teams: project.teams.map(({ team }) => ({
+          id: team.id,
+          name: team.name,
+          description: team.description,
+          color: team.color,
+          members: team.members.map(({ id, userId }) => ({ id, userId })),
+        })),
       },
     });
   } catch (error) {

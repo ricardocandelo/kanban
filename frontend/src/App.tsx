@@ -10,6 +10,7 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage.js';
 import { ResetPasswordPage } from './pages/ResetPasswordPage.js';
 import { DashboardPage } from './pages/DashboardPage.js';
 import { BoardPage } from './pages/BoardPage.js';
+import { InvitePage } from './pages/InvitePage.js';
 import { useThemeStore } from './stores/themeStore.js';
 
 const queryClient = new QueryClient({
@@ -56,6 +57,7 @@ export const App: React.FC = () => {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/invite/:token" element={<InvitePage />} />
 
           {/* Rutas Protegidas */}
           <Route

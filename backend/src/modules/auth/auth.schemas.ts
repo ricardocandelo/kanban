@@ -6,6 +6,7 @@ export const registerSchema = z.object({
   firstName: z.string().min(1, 'El nombre es obligatorio'),
   lastName: z.string().min(1, 'El apellido es obligatorio'),
   workspaceName: z.string().optional(),
+  inviteToken: z.string().uuid().optional(),
 });
 
 export const loginSchema = z.object({

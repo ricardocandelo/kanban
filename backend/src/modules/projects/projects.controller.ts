@@ -25,7 +25,7 @@ export class ProjectsController {
   static async create(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const data = createProjectSchema.parse(req.body);
-      const project = await ProjectsService.create(req.params.workspaceId, data);
+      const project = await ProjectsService.create(req.params.workspaceId, req.user!.userId, data);
       res.status(201).json({ success: true, data: project });
     } catch (error) {
       next(error);

@@ -8,6 +8,8 @@ import { TaskDetailModal } from '../components/TaskDetailModal.js';
 import { UsersAndTeamsModal } from '../components/UsersAndTeamsModal.js';
 import { ProjectMembersModal } from '../components/ProjectMembersModal.js';
 import { UserProfileModal } from '../components/UserProfileModal.js';
+import { WorkspaceManagementModal } from '../components/WorkspaceManagementModal.js';
+import { useAuthStore } from '../stores/authStore.js';
 import { useBoardStore } from '../stores/boardStore.js';
 
 export const AppLayout: React.FC = () => {
@@ -17,7 +19,9 @@ export const AppLayout: React.FC = () => {
   const [isUsersModalOpen, setIsUsersModalOpen] = useState(false);
   const [isProjectMembersModalOpen, setIsProjectMembersModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [workspaceModalMode, setWorkspaceModalMode] = useState<'create' | 'delete' | null>(null);
   const { activeBoard, selectedTaskId, setSelectedTaskId } = useBoardStore();
+  const { currentWorkspace } = useAuthStore();
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#f8fafc] dark:bg-[#060911] font-sans antialiased transition-colors">
@@ -36,6 +40,8 @@ export const AppLayout: React.FC = () => {
           onOpenNewProject={() => setIsProjectModalOpen(true)}
           onOpenUsersAndTeams={() => setIsUsersModalOpen(true)}
           onOpenProfile={() => setIsProfileModalOpen(true)}
+          onCreateWorkspace={() => setWorkspaceModalMode('create')}
+          onDeleteWorkspace={() => setWorkspaceModalMode('delete')}
         />
       </div>
 
@@ -60,6 +66,8 @@ export const AppLayout: React.FC = () => {
             setIsMobileMenuOpen(false);
             setIsProfileModalOpen(true);
           }}
+          onCreateWorkspace={() => setWorkspaceModalMode('create')}
+          onDeleteWorkspace={() => setWorkspaceModalMode('delete')}
         />
       </div>
 
@@ -108,6 +116,14 @@ export const AppLayout: React.FC = () => {
 
       {isProfileModalOpen && (
         <UserProfileModal onClose={() => setIsProfileModalOpen(false)} />
+      )}
+
+      {workspaceModalMode && (
+        <WorkspaceManagementModal
+          mode={workspaceModalMode}
+          workspace={currentWorkspace}
+          onClose={() => setWorkspaceModalMode(null)}
+        />
       )}
     </div>
   );

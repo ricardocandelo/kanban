@@ -18,6 +18,7 @@ import notificationRoutes from './modules/notifications/notifications.routes.js'
 import dashboardRoutes from './modules/dashboard/dashboard.routes.js';
 import usersRoutes from './modules/users/users.routes.js';
 import teamsRoutes from './modules/teams/teams.routes.js';
+import invitesRoutes from './modules/invites/invites.routes.js';
 
 export const createApp = (): Express => {
   const app = express();
@@ -80,6 +81,7 @@ export const createApp = (): Express => {
   app.use('/api', dashboardRoutes);
   app.use('/api', usersRoutes);
   app.use('/api', teamsRoutes);
+  app.use('/api', invitesRoutes);
 
   // Manejador centralizado de errores
   app.use(errorHandler);

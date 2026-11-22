@@ -21,6 +21,8 @@ interface SidebarProps {
   onOpenNewProject: () => void;
   onOpenUsersAndTeams: () => void;
   onOpenProfile: () => void;
+  onCreateWorkspace: () => void;
+  onDeleteWorkspace: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -29,6 +31,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenNewProject,
   onOpenUsersAndTeams,
   onOpenProfile,
+  onCreateWorkspace,
+  onDeleteWorkspace,
 }) => {
   const { user, currentWorkspace, workspaces, setCurrentWorkspace, logout } = useAuthStore();
   const navigate = useNavigate();
@@ -120,6 +124,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 )}
               </button>
             ))}
+            <div className="my-1 border-t border-slate-200 dark:border-[#1a2947]" />
+            <button
+              onClick={() => {
+                onCreateWorkspace();
+                handleNavClick();
+              }}
+              className="w-full px-3 py-2 text-left text-xs font-medium text-blue-600 hover:bg-slate-50 dark:text-blue-400 dark:hover:bg-[#162544]"
+            >
+              + Crear espacio de trabajo
+            </button>
+            {currentWorkspace?.role === 'OWNER' && (
+              <button
+                onClick={() => {
+                  onDeleteWorkspace();
+                  handleNavClick();
+                }}
+                className="w-full px-3 py-2 text-left text-xs font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10"
+              >
+                Eliminar este espacio
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -154,7 +179,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-[#101a30] transition text-left cursor-pointer"
           >
             <Users className="w-4 h-4 opacity-80 text-blue-500" />
-            <span>Usuarios y equipos</span>
+            <span>{user?.isSuperAdmin ? 'Usuarios y equipos' : 'Equipos y miembros'}</span>
           </button>
         </div>
 

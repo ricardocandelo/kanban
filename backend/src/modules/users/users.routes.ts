@@ -2,7 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { AuthenticatedRequest, authenticate } from '../../middlewares/auth.middleware.js';
 import { prisma } from '../../config/db.js';
 import bcrypt from 'bcryptjs';
-import { BadRequestError, ForbiddenError } from '../../utils/errors.js';
+import { BadRequestError, ConflictError, ForbiddenError } from '../../utils/errors.js';
 import { z } from 'zod';
 import { WorkspaceRole } from '@prisma/client';
 
@@ -25,6 +25,62 @@ router.get('/users', async (req: AuthenticatedRequest, res: Response, next: Next
   try {
     const q = ((req.query.q as string) || '').toLowerCase().trim();
     const workspaceId = req.query.workspaceId as string;
+    const requester = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { isSuperAdmin: true },
+    });
+
+    if (!requester?.isSuperAdmin) {
+      if (!workspaceId) {
+        throw new ForbiddenError('Solo un Super Administrador puede consultar usuarios globalmente');
+      }
+
+      const membership = await prisma.workspaceMember.findUnique({
+        where: {
+          workspaceId_userId: {
+            workspaceId,
+            userId: req.user!.userId,
+          },
+        },
+      });
+      if (!membership) {
+        throw new ForbiddenError('No perteneces a este espacio de trabajo');
+      }
+      if (membership.role !== WorkspaceRole.OWNER && membership.role !== WorkspaceRole.ADMIN) {
+        const managedTeam = await prisma.team.findFirst({
+          where: {
+            workspaceId,
+            OR: [
+              { createdById: req.user!.userId },
+              {
+                members: {
+                  some: {
+                    userId: req.user!.userId,
+                    OR: [{ canManage: true }, { role: 'LEADER' }],
+                  },
+                },
+              },
+            ],
+          },
+          select: { id: true },
+        });
+        if (!managedTeam) {
+          throw new ForbiddenError('Solo administradores o gestores de equipo pueden consultar usuarios');
+        }
+      }
+    }
+
+    const userSelect = {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      avatarUrl: true,
+      isActive: true,
+    };
+    const select = requester?.isSuperAdmin
+      ? { ...userSelect, isSuperAdmin: true, workspaces: { select: { workspaceId: true, role: true } } }
+      : userSelect;
 
     const users = await prisma.user.findMany({
       where: {
@@ -47,21 +103,7 @@ router.get('/users', async (req: AuthenticatedRequest, res: Response, next: Next
             : {},
         ],
       },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        avatarUrl: true,
-        isActive: true,
-        isSuperAdmin: true,
-        workspaces: {
-          select: {
-            workspaceId: true,
-            role: true,
-          },
-        },
-      },
+      select,
       take: 50,
       orderBy: { createdAt: 'desc' },
     });
@@ -260,6 +302,26 @@ router.delete('/users/:userId', async (req: AuthenticatedRequest, res: Response,
 
     if (req.user!.userId === req.params.userId) {
       throw new BadRequestError('No puedes eliminar tu propia cuenta');
+    }
+
+    const ownedWorkspace = await prisma.workspace.findFirst({
+      where: { ownerId: req.params.userId },
+      select: { id: true },
+    });
+    if (ownedWorkspace) {
+      throw new ConflictError(
+        'No se puede eliminar este usuario porque es propietario de un espacio de trabajo. Desactiva su cuenta o transfiere la propiedad antes de eliminarlo.'
+      );
+    }
+
+    const createdTask = await prisma.task.findFirst({
+      where: { createdById: req.params.userId },
+      select: { id: true },
+    });
+    if (createdTask) {
+      throw new ConflictError(
+        'No se puede eliminar este usuario porque tiene tareas creadas. Desactiva su cuenta o reasigna/elimina sus tareas antes de eliminarlo.'
+      );
     }
 
     await prisma.$transaction([

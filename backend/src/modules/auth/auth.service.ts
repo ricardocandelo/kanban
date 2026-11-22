@@ -18,6 +18,17 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(input.password, salt);
 
     const user = await prisma.$transaction(async (tx) => {
+      const invite = input.inviteToken
+        ? await tx.projectInviteLink.findUnique({
+            where: { token: input.inviteToken },
+            include: { project: { include: { workspace: true } } },
+          })
+        : null;
+
+      if (input.inviteToken && (!invite || !invite.isActive || (invite.expiresAt && invite.expiresAt < new Date()))) {
+        throw new BadRequestError('La invitación no existe o ha expirado');
+      }
+
       const newUser = await tx.user.create({
         data: {
           email: input.email.toLowerCase(),
@@ -26,6 +37,28 @@ export class AuthService {
           lastName: input.lastName,
         },
       });
+
+      if (invite) {
+        await tx.workspaceMember.create({
+          data: {
+            workspaceId: invite.project.workspaceId,
+            userId: newUser.id,
+            role: 'MEMBER',
+          },
+        });
+        await tx.projectMember.create({
+          data: {
+            projectId: invite.projectId,
+            userId: newUser.id,
+            role: invite.role,
+          },
+        });
+
+        return {
+          user: newUser,
+          workspace: { ...invite.project.workspace, role: 'MEMBER' as const },
+        };
+      }
 
       const wsName = input.workspaceName || `${input.firstName}'s Space`;
       const baseSlug = wsName.toLowerCase().replace(/[^a-z0-9]/g, '-');

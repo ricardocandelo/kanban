@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useBoardStore } from '../stores/boardStore.js';
 import { useThemeStore } from '../stores/themeStore.js';
+import { useAuthStore } from '../stores/authStore.js';
 import { TaskPriority } from '../types/index.js';
 
 interface NavbarProps {
@@ -33,6 +34,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   } = useBoardStore();
 
   const { theme, toggle: toggleTheme } = useThemeStore();
+  const { user, currentWorkspace } = useAuthStore();
+  const canManageProjectMembers =
+    user?.isSuperAdmin || currentWorkspace?.role === 'OWNER' || currentWorkspace?.role === 'ADMIN';
 
   return (
     <header className="h-[60px] border-b border-slate-200 dark:border-[#1a2947] bg-white dark:bg-[#0b1120] px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4 select-none transition-colors">
@@ -93,7 +97,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Acciones Responsivas: Miembros, Buscador, Filtro, Tema y Botón Nueva Tarea */}
       <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-        {activeBoard?.project && onOpenProjectMembers && (
+        {canManageProjectMembers && activeBoard?.project && onOpenProjectMembers && (
           <button
             onClick={onOpenProjectMembers}
             className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-[#111a2e] dark:hover:bg-[#162544] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#1a2947] transition"

@@ -42,7 +42,7 @@ export class ProjectsService {
     return project;
   }
 
-  static async create(workspaceId: string, input: CreateProjectInput) {
+  static async create(workspaceId: string, userId: string, input: CreateProjectInput) {
     return prisma.$transaction(async (tx) => {
       const project = await tx.project.create({
         data: {
@@ -53,6 +53,14 @@ export class ProjectsService {
           privacy: input.privacy,
           startDate: input.startDate ? new Date(input.startDate) : null,
           targetDate: input.targetDate ? new Date(input.targetDate) : null,
+        },
+      });
+
+      await tx.projectMember.create({
+        data: {
+          projectId: project.id,
+          userId,
+          role: 'ADMIN',
         },
       });
 

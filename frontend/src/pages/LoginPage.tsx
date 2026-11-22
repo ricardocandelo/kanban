@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { useAuthStore } from '../stores/authStore.js';
 import { Kanban, ArrowRight, Eye, EyeOff } from 'lucide-react';
@@ -12,6 +12,8 @@ export const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const { setAuth } = useAuthStore();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const inviteToken = searchParams.get('invite') || sessionStorage.getItem('pending_invite_token');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,10 +21,16 @@ export const LoginPage: React.FC = () => {
       setLoading(true);
       const res = await api.post('/auth/login', { email, password });
       const { user, accessToken, workspaces } = res.data.data;
-
       setAuth(user, accessToken, workspaces);
       toast.success(`¡Bienvenido de vuelta, ${user.firstName}!`);
-      navigate('/dashboard');
+
+      // Si hay invite pendiente, aceptarlo y redirigir a la página de invitación
+      if (inviteToken) {
+        sessionStorage.removeItem('pending_invite_token');
+        navigate(`/invite/${inviteToken}`);
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Error al iniciar sesión');
     } finally {
@@ -106,7 +114,10 @@ export const LoginPage: React.FC = () => {
 
         <div className="mt-6 text-center text-xs text-slate-500 dark:text-slate-400">
           ¿No tienes una cuenta aún?{' '}
-          <Link to="/register" className="text-blue-600 dark:text-blue-400 font-semibold hover:underline">
+          <Link
+            to={inviteToken ? `/register?invite=${inviteToken}` : '/register'}
+            className="text-blue-600 dark:text-blue-400 font-semibold hover:underline"
+          >
             Regístrate aquí
           </Link>
         </div>

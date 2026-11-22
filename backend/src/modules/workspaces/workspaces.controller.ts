@@ -4,6 +4,7 @@ import { WorkspacesService } from './workspaces.service.js';
 import {
   createWorkspaceSchema,
   updateWorkspaceSchema,
+  deleteWorkspaceSchema,
   inviteMemberSchema,
   updateMemberRoleSchema,
 } from './workspaces.schemas.js';
@@ -49,7 +50,8 @@ export class WorkspacesController {
 
   static async delete(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      await WorkspacesService.delete(req.params.workspaceId);
+      const { confirmationName } = deleteWorkspaceSchema.parse(req.body);
+      await WorkspacesService.delete(req.params.workspaceId, confirmationName);
       res.json({ success: true, message: 'Espacio de trabajo eliminado con éxito' });
     } catch (error) {
       next(error);

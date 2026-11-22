@@ -28,6 +28,12 @@ export class ForbiddenError extends AppError {
   }
 }
 
+export class ConflictError extends AppError {
+  constructor(message = 'Conflicto con el estado actual del recurso') {
+    super(message, 409);
+  }
+}
+
 export class BadRequestError extends AppError {
   constructor(message = 'Solicitud inválida', details?: any) {
     super(message, 400, details);

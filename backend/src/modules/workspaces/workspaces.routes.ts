@@ -22,7 +22,11 @@ router.delete(
 );
 
 // Miembros
-router.get('/:workspaceId/members', WorkspacesController.listMembers as any);
+router.get(
+  '/:workspaceId/members',
+  requireWorkspaceRole([WorkspaceRole.OWNER, WorkspaceRole.ADMIN]) as any,
+  WorkspacesController.listMembers as any
+);
 router.post(
   '/:workspaceId/invitations',
   requireWorkspaceRole([WorkspaceRole.OWNER, WorkspaceRole.ADMIN]) as any,

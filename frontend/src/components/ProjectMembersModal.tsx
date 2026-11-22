@@ -11,6 +11,11 @@ import {
   Search,
   Check,
   Trash2,
+  Share2,
+  Link as LinkIcon,
+  Copy,
+  Shield,
+  Eye,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -27,8 +32,10 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
 }) => {
   const queryClient = useQueryClient();
   const { currentWorkspace } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'members' | 'add_user' | 'add_team'>('members');
+  const [activeTab, setActiveTab] = useState<'members' | 'add_user' | 'add_team' | 'share'>('members');
   const [searchQuery, setSearchQuery] = useState('');
+  const [inviteRole, setInviteRole] = useState<'VIEWER' | 'MEMBER' | 'ADMIN'>('MEMBER');
+  const [expiresInDays, setExpiresInDays] = useState<number>(7);
 
   // 1. Obtener miembros actuales del proyecto
   const { data: projectData } = useQuery<{ members: (User & { source: string })[]; teams: Team[] }>({
@@ -59,6 +66,41 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
       return res.data.data;
     },
     enabled: !!currentWorkspace?.id,
+  });
+
+  const { data: inviteLinks = [], refetch: refetchInviteLinks } = useQuery<any[]>({
+    queryKey: ['project_invite_links', projectId],
+    queryFn: async () => {
+      const res = await api.get(`/projects/${projectId}/invite-links`);
+      return res.data.data;
+    },
+  });
+
+  const createInviteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await api.post(`/projects/${projectId}/invite-links`, {
+        role: inviteRole,
+        expiresInDays: expiresInDays || undefined,
+      });
+      return res.data.data;
+    },
+    onSuccess: () => {
+      refetchInviteLinks();
+      toast.success('Enlace de invitación creado');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Error al crear el enlace');
+    },
+  });
+
+  const revokeInviteMutation = useMutation({
+    mutationFn: async (linkId: string) => {
+      await api.delete(`/invite-links/${linkId}`);
+    },
+    onSuccess: () => {
+      refetchInviteLinks();
+      toast.success('Enlace revocado');
+    },
   });
 
   // Mutación: Agregar usuario individual al proyecto
@@ -163,6 +205,17 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
           >
             <Layers className="w-3.5 h-3.5" />
             + Vincular Equipo Completo
+          </button>
+          <button
+            onClick={() => setActiveTab('share')}
+            className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition ${
+              activeTab === 'share'
+                ? 'border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+            }`}
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            Compartir enlace
           </button>
         </div>
 
@@ -331,6 +384,103 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
                     </button>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: COMPARTIR POR ENLACE */}
+          {activeTab === 'share' && (
+            <div className="space-y-5">
+              <div className="p-4 rounded-xl border border-slate-200 dark:border-[#1a2947] bg-slate-50 dark:bg-[#101a30] space-y-4">
+                <div>
+                  <p className="text-xs font-bold text-slate-900 dark:text-white">Crear enlace de invitación</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                    Al abrirlo, el usuario iniciará sesión o podrá crear una cuenta antes de unirse.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
+                      Permiso
+                    </label>
+                    <select
+                      value={inviteRole}
+                      onChange={(e) => setInviteRole(e.target.value as 'VIEWER' | 'MEMBER' | 'ADMIN')}
+                      className="w-full px-3 py-2 rounded-lg text-xs bg-white dark:bg-[#0b1120] border border-slate-200 dark:border-[#1a2947] text-slate-900 dark:text-white"
+                    >
+                      <option value="VIEWER">Visualizador</option>
+                      <option value="MEMBER">Miembro</option>
+                      <option value="ADMIN">Administrador</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
+                      Vigencia
+                    </label>
+                    <select
+                      value={expiresInDays}
+                      onChange={(e) => setExpiresInDays(Number(e.target.value))}
+                      className="w-full px-3 py-2 rounded-lg text-xs bg-white dark:bg-[#0b1120] border border-slate-200 dark:border-[#1a2947] text-slate-900 dark:text-white"
+                    >
+                      <option value={1}>1 día</option>
+                      <option value={7}>7 días</option>
+                      <option value={30}>30 días</option>
+                      <option value={0}>Sin vencimiento</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => createInviteMutation.mutate()}
+                  disabled={createInviteMutation.isPending}
+                  className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <LinkIcon className="w-3.5 h-3.5" />
+                  {createInviteMutation.isPending ? 'Creando enlace...' : 'Generar enlace'}
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Enlaces activos</p>
+                {inviteLinks.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic py-4 text-center">No hay enlaces activos</p>
+                ) : (
+                  inviteLinks.map((link) => {
+                    const url = `${window.location.origin}/invite/${link.token}`;
+                    const roleLabel = link.role === 'VIEWER' ? 'Visualizador' : link.role === 'ADMIN' ? 'Administrador' : 'Miembro';
+                    const RoleIcon = link.role === 'VIEWER' ? Eye : link.role === 'ADMIN' ? Shield : Users;
+                    return (
+                      <div key={link.id} className="p-3 rounded-xl border border-slate-200 dark:border-[#1a2947] flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
+                          <RoleIcon className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-slate-900 dark:text-white">{roleLabel}</p>
+                          <p className="text-[10px] text-slate-400 truncate">{url}</p>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            await navigator.clipboard.writeText(url);
+                            toast.success('Enlace copiado');
+                          }}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-500/10"
+                          title="Copiar enlace"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => revokeInviteMutation.mutate(link.id)}
+                          disabled={revokeInviteMutation.isPending}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-500/10"
+                          title="Revocar enlace"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           )}

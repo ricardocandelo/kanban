@@ -34,7 +34,12 @@ interface UsersAndTeamsModalProps {
 export const UsersAndTeamsModal: React.FC<UsersAndTeamsModalProps> = ({ onClose }) => {
   const queryClient = useQueryClient();
   const { user: currentUser, currentWorkspace } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'users' | 'teams'>('users');
+  const isSuperAdmin = !!currentUser?.isSuperAdmin;
+  const canManageWorkspace =
+    isSuperAdmin || currentWorkspace?.role === 'OWNER' || currentWorkspace?.role === 'ADMIN';
+  const [activeTab, setActiveTab] = useState<'users' | 'teams'>(() =>
+    currentUser?.isSuperAdmin ? 'users' : 'teams'
+  );
   const [searchQuery, setSearchQuery] = useState('');
 
   // Estados formulario nuevo usuario
@@ -68,18 +73,7 @@ export const UsersAndTeamsModal: React.FC<UsersAndTeamsModalProps> = ({ onClose 
   const [addMemberUserId, setAddMemberUserId] = useState('');
   const [addMemberWithPermission, setAddMemberWithPermission] = useState(false);
 
-  // 1. Obtener lista de usuarios
-  const { data: users = [] } = useQuery<User[]>({
-    queryKey: ['users', searchQuery, currentWorkspace?.id],
-    queryFn: async () => {
-      const res = await api.get('/users', {
-        params: { q: searchQuery || undefined, workspaceId: currentWorkspace?.id },
-      });
-      return res.data.data;
-    },
-  });
-
-  // 2. Obtener lista de equipos
+  // 1. Obtener lista de equipos
   const { data: teams = [] } = useQuery<Team[]>({
     queryKey: ['teams', currentWorkspace?.id],
     queryFn: async () => {
@@ -88,6 +82,21 @@ export const UsersAndTeamsModal: React.FC<UsersAndTeamsModalProps> = ({ onClose 
       return res.data.data;
     },
     enabled: !!currentWorkspace?.id,
+  });
+
+  // 2. Los usuarios globales solo están disponibles para superadministradores.
+  const { data: users = [] } = useQuery<User[]>({
+    queryKey: ['users', searchQuery, currentWorkspace?.id, isSuperAdmin],
+    queryFn: async () => {
+      const res = await api.get('/users', {
+        params: {
+          q: searchQuery || undefined,
+          workspaceId: isSuperAdmin ? undefined : currentWorkspace?.id,
+        },
+      });
+      return res.data.data;
+    },
+    enabled: canManageWorkspace || teams.some((team) => team.userCanManage),
   });
 
   // Mantener datos actualizados del equipo que se está gestionando
@@ -349,7 +358,7 @@ export const UsersAndTeamsModal: React.FC<UsersAndTeamsModalProps> = ({ onClose 
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-                  Administración de Usuarios y Equipos
+                  {isSuperAdmin ? 'Administración de Usuarios y Equipos' : 'Equipos y miembros'}
                 </h2>
                 {currentUser?.isSuperAdmin && (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-500 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1">
@@ -359,7 +368,9 @@ export const UsersAndTeamsModal: React.FC<UsersAndTeamsModalProps> = ({ onClose 
                 )}
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Gestiona cuentas, contraseñas, equipos y permisos de delegación.
+                {isSuperAdmin
+                  ? 'Gestiona cuentas, contraseñas, equipos y permisos de delegación.'
+                  : 'Consulta los equipos del espacio y sus integrantes.'}
               </p>
             </div>
           </div>
@@ -371,16 +382,18 @@ export const UsersAndTeamsModal: React.FC<UsersAndTeamsModalProps> = ({ onClose 
 
         {/* Pestañas */}
         <div className="flex items-center px-4 sm:px-6 border-b border-slate-200 dark:border-[#1a2947] bg-slate-50/50 dark:bg-[#0b1120]/50">
-          <button
-            onClick={() => setActiveTab('users')}
-            className={`py-3 px-3 sm:px-4 text-xs font-semibold flex items-center gap-2 border-b-2 transition ${activeTab === 'users'
-                ? 'border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-              }`}
-          >
-            <Users className="w-4 h-4" />
-            Usuarios ({users.length})
-          </button>
+          {isSuperAdmin && (
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`py-3 px-3 sm:px-4 text-xs font-semibold flex items-center gap-2 border-b-2 transition ${activeTab === 'users'
+                  ? 'border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+            >
+              <Users className="w-4 h-4" />
+              Usuarios ({users.length})
+            </button>
+          )}
           <button
             onClick={() => setActiveTab('teams')}
             className={`py-3 px-3 sm:px-4 text-xs font-semibold flex items-center gap-2 border-b-2 transition ${activeTab === 'teams'
@@ -396,7 +409,7 @@ export const UsersAndTeamsModal: React.FC<UsersAndTeamsModalProps> = ({ onClose 
         {/* Contenido */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           {/* TAB 1: USUARIOS */}
-          {activeTab === 'users' && (
+          {isSuperAdmin && activeTab === 'users' && (
             <div className="space-y-5">
               <div className="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
                 <div className="relative flex-1 min-w-[200px] max-w-sm">
@@ -669,13 +682,15 @@ export const UsersAndTeamsModal: React.FC<UsersAndTeamsModalProps> = ({ onClose 
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   Los equipos son gestionados por <strong>quien los creó</strong> o por miembros a quienes se les otorgó <strong>permiso de gestión</strong>.
                 </p>
-                <button
-                  onClick={() => setIsCreatingTeam(!isCreatingTeam)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition shrink-0 cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Nuevo Equipo</span>
-                </button>
+                {canManageWorkspace && (
+                  <button
+                    onClick={() => setIsCreatingTeam(!isCreatingTeam)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition shrink-0 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Nuevo Equipo</span>
+                  </button>
+                )}
               </div>
 
               {/* Formulario nuevo equipo */}
@@ -829,8 +844,8 @@ export const UsersAndTeamsModal: React.FC<UsersAndTeamsModalProps> = ({ onClose 
                         {t.members?.slice(0, 5).map((m) => (
                           <div
                             key={m.id}
-                            title={`${m.user.firstName} ${m.user.lastName} ${m.canManage ? '(Gestor)' : ''}`}
-                            className={`w-6 h-6 rounded-full border border-white dark:border-[#101a30] bg-blue-600 flex items-center justify-center text-[9px] font-bold text-white overflow-hidden ${m.canManage ? 'ring-1 ring-blue-400' : ''
+                            title={`${m.user.firstName} ${m.user.lastName}${t.userCanManage && m.canManage ? ' (Gestor)' : ''}`}
+                            className={`w-6 h-6 rounded-full border border-white dark:border-[#101a30] bg-blue-600 flex items-center justify-center text-[9px] font-bold text-white overflow-hidden ${t.userCanManage && m.canManage ? 'ring-1 ring-blue-400' : ''
                               }`}
                           >
                             {m.user.avatarUrl ? (
