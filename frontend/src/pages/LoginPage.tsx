@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { useAuthStore } from '../stores/authStore.js';
-import { Kanban, ArrowRight } from 'lucide-react';
+import { Kanban, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('ricardocandelo07@gmail.com');
-  const [password, setPassword] = useState('Candelo2026*');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { setAuth } = useAuthStore();
   const navigate = useNavigate();
@@ -72,14 +73,25 @@ export const LoginPage: React.FC = () => {
                 ¿Olvidaste tu contraseña?
               </Link>
             </div>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full px-4 py-2.5 rounded-lg bg-slate-50 dark:bg-[#101a30] border border-slate-200 dark:border-[#1a2947] text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full px-4 py-2.5 pr-10 rounded-lg bg-slate-50 dark:bg-[#101a30] border border-slate-200 dark:border-[#1a2947] text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
+                tabIndex={-1}
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
 
           <button
